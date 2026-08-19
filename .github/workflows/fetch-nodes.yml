@@ -1,0 +1,140 @@
+name: 每日节点抓取
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # UTC 0点 = 北京 8点
+  workflow_dispatch:      # 支持手动触发
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 获取最新节点
+        run: |
+          # 获取分类页最新文章链接
+          LATEST_URL=$(curl -sL --connect-timeout 20 --max-time 45 "https://yoyapai.com/category/mianfeijiedian" \
+            | sed 's/&#47;/\//g' \
+            | grep -oE 'https://yoyapai\.com/[0-9]+' \
+            | head -1)
+
+          if [ -z "$LATEST_URL" ]; then
+            echo "ERROR: 无法获取最新文章链接"
+            exit 1
+          fi
+
+          echo "最新文章: $LATEST_URL"
+
+          # 获取文章内容
+          PAGE=$(curl -sL --connect-timeout 20 --max-time 45 "$LATEST_URL")
+          PAGE=$(echo "$PAGE" | sed 's/&#47;/\//g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g')
+
+          # 提取订阅链接
+          CLASH_URL=$(echo "$PAGE" | grep -oE 'https://freenode\.yoyapai\.com/[^"<> ]+\.yaml' | head -1)
+          V2RAY_URL=$(echo "$PAGE" | grep -oE 'https://freenode\.yoyapai\.com/[^"<> ]+\.txt' | head -1)
+
+          # 提取信息
+          DATE=$(echo "$PAGE" | grep -oE '[0-9]{4}年[0-9]{1,2}月[0-9]{1,2}日' | head -1)
+          COUNT=$(echo "$PAGE" | grep -oE '更新数量[：:][0-9]+' | grep -oE '[0-9]+' | head -1)
+          SPEED=$(echo "$PAGE" | grep -oE '实测速度[：:][0-9.]+MB/s' | head -1 | sed 's/.*[：:]//')
+
+          # 下载完整配置
+          if [ -n "$CLASH_URL" ]; then
+            curl -sL --connect-timeout 20 --max-time 60 "$CLASH_URL" > clash-config.yaml
+          fi
+          if [ -n "$V2RAY_URL" ]; then
+            curl -sL --connect-timeout 20 --max-time 60 "$V2RAY_URL" > v2ray-nodes.txt
+          fi
+
+          # 生成结果页
+          mkdir -p docs
+          cat > docs/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="zh">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>每日免费节点</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { font-family: -apple-system, sans-serif; background: #0d1117; color: #e6edf3; padding: 16px; }
+              .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin: 12px 0; }
+              h1 { font-size: 20px; margin-bottom: 8px; }
+              .date { color: #58a6ff; font-size: 14px; margin-bottom: 16px; }
+              .info { display: flex; gap: 16px; margin-bottom: 16px; }
+              .info span { background: #21262d; padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+              .label { color: #8b949e; font-size: 13px; margin-bottom: 6px; }
+              .url { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; font-size: 13px; word-break: break-all; font-family: monospace; margin-bottom: 8px; position: relative; }
+              .url a { color: #58a6ff; text-decoration: none; }
+              .copy-btn { background: #238636; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; width: 100%; margin: 4px 0 12px; }
+              .copy-btn:active { background: #2ea043; }
+              .note { color: #8b949e; font-size: 12px; line-height: 1.6; }
+              .raw { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; font-size: 12px; font-family: monospace; word-break: break-all; max-height: 120px; overflow-y: auto; margin: 8px 0; color: #7ee787; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>🚀 每日免费节点</h1>
+              <div class="date" id="date">DATE_PLACEHOLDER</div>
+              <div class="info">
+                <span>📊 COUNT_PLACEHOLDER 个节点</span>
+                <span>⚡ SPEED_PLACEHOLDER</span>
+              </div>
+
+              <div class="label">Clash / Clash Meta / Mihomo 订阅：</div>
+              <div class="url"><a id="clash" href="CLASH_PLACEHOLDER">CLASH_PLACEHOLDER</a></div>
+              <button class="copy-btn" onclick="copy('clash')">📋 复制 Clash 链接</button>
+
+              <div class="label">V2Ray / V2RayN / V2RayNG 订阅：</div>
+              <div class="url"><a id="v2ray" href="V2RAY_PLACEHOLDER">V2RAY_PLACEHOLDER</a></div>
+              <button class="copy-btn" onclick="copy('v2ray')">📋 复制 V2Ray 链接</button>
+
+              <div class="label">Clash 配置预览：</div>
+              <div class="raw" id="clash-raw">加载中...</div>
+
+              <div class="label">V2Ray 节点预览：</div>
+              <div class="raw" id="v2ray-raw">加载中...</div>
+
+              <div class="note">
+                ⚠️ 免费节点多人共享，高峰可能较慢<br>
+                📱 Clash 客户端：配置 → 粘贴URL → 导入<br>
+                📱 V2RayN：订阅 → 添加 → 粘贴URL → 更新<br>
+                🕐 每日 UTC 00:00 (北京 08:00) 自动更新
+              </div>
+            </div>
+
+            <script>
+              function copy(id) {
+                const text = document.getElementById(id).textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                  const btn = event.target;
+                  btn.textContent = '✅ 已复制！';
+                  setTimeout(() => btn.textContent = '📋 复制 ' + (id === 'clash' ? 'Clash' : 'V2Ray') + ' 链接', 2000);
+                });
+              }
+              fetch('clash-config.yaml').then(r => r.text()).then(t => {
+                document.getElementById('clash-raw').textContent = t.substring(0, 2000) + '\n...';
+              }).catch(() => document.getElementById('clash-raw').textContent = '暂无');
+              fetch('v2ray-nodes.txt').then(r => r.text()).then(t => {
+                document.getElementById('v2ray-raw').textContent = t.substring(0, 2000) + '\n...';
+              }).catch(() => document.getElementById('v2ray-raw').textContent = '暂无');
+            </script>
+          </body>
+          </html>
+          HTMLEOF
+
+          # 替换占位符
+          sed -i "s|DATE_PLACEHOLDER|${DATE:-今天}|g" docs/index.html
+          sed -i "s|COUNT_PLACEHOLDER|${COUNT:-?}|g" docs/index.html
+          sed -i "s|SPEED_PLACEHOLDER|${SPEED:-未知}|g" docs/index.html
+          sed -i "s|CLASH_PLACEHOLDER|${CLASH_URL:-未获取到}|g" docs/index.html
+          sed -i "s|V2RAY_PLACEHOLDER|${V2RAY_URL:-未获取到}|g" docs/index.html
+
+          echo "done=true" >> $GITHUB_OUTPUT
+
+      - name: 部署到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
