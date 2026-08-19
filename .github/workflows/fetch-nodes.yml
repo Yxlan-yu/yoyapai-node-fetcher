@@ -2,8 +2,8 @@ name: 每日节点抓取
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # UTC 0点 = 北京 8点
-  workflow_dispatch:      # 支持手动触发
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -44,98 +44,161 @@ jobs:
           SPEED=$(echo "$PAGE" | grep -oE '实测速度[：:][0-9.]+MB/s' | head -1 | sed 's/.*[：:]//')
 
           # 下载完整配置
+          mkdir -p docs
           if [ -n "$CLASH_URL" ]; then
-            curl -sL --connect-timeout 20 --max-time 60 "$CLASH_URL" > clash-config.yaml
+            curl -sL --connect-timeout 20 --max-time 60 "$CLASH_URL" > docs/clash-config.yaml
           fi
           if [ -n "$V2RAY_URL" ]; then
-            curl -sL --connect-timeout 20 --max-time 60 "$V2RAY_URL" > v2ray-nodes.txt
+            curl -sL --connect-timeout 20 --max-time 60 "$V2RAY_URL" > docs/v2ray-nodes.txt
           fi
 
-          # 生成结果页
-          mkdir -p docs
-          cat > docs/index.html << 'HTMLEOF'
-          <!DOCTYPE html>
-          <html lang="zh">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>每日免费节点</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { font-family: -apple-system, sans-serif; background: #0d1117; color: #e6edf3; padding: 16px; }
-              .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin: 12px 0; }
-              h1 { font-size: 20px; margin-bottom: 8px; }
-              .date { color: #58a6ff; font-size: 14px; margin-bottom: 16px; }
-              .info { display: flex; gap: 16px; margin-bottom: 16px; }
-              .info span { background: #21262d; padding: 6px 12px; border-radius: 8px; font-size: 13px; }
-              .label { color: #8b949e; font-size: 13px; margin-bottom: 6px; }
-              .url { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; font-size: 13px; word-break: break-all; font-family: monospace; margin-bottom: 8px; position: relative; }
-              .url a { color: #58a6ff; text-decoration: none; }
-              .copy-btn { background: #238636; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; width: 100%; margin: 4px 0 12px; }
-              .copy-btn:active { background: #2ea043; }
-              .note { color: #8b949e; font-size: 12px; line-height: 1.6; }
-              .raw { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; font-size: 12px; font-family: monospace; word-break: break-all; max-height: 120px; overflow-y: auto; margin: 8px 0; color: #7ee787; }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <h1>🚀 每日免费节点</h1>
-              <div class="date" id="date">DATE_PLACEHOLDER</div>
-              <div class="info">
-                <span>📊 COUNT_PLACEHOLDER 个节点</span>
-                <span>⚡ SPEED_PLACEHOLDER</span>
-              </div>
+          # 提取纯节点链接（去掉注释行）
+          grep -E '^(vmess|vless|trojan|ss|ssr|hysteria2?)://' docs/v2ray-nodes.txt > docs/v2ray-links.txt 2>/dev/null || true
+          NODE_COUNT=$(wc -l < docs/v2ray-links.txt)
 
-              <div class="label">Clash / Clash Meta / Mihomo 订阅：</div>
-              <div class="url"><a id="clash" href="CLASH_PLACEHOLDER">CLASH_PLACEHOLDER</a></div>
-              <button class="copy-btn" onclick="copy('clash')">📋 复制 Clash 链接</button>
+          # 把节点链接转成 JSON 数组用于前端
+          NODES_JSON=$(python3 -c "
+import json, sys
+lines = [l.strip() for l in open('docs/v2ray-links.txt') if l.strip()]
+print(json.dumps(lines))
+          ")
 
-              <div class="label">V2Ray / V2RayN / V2RayNG 订阅：</div>
-              <div class="url"><a id="v2ray" href="V2RAY_PLACEHOLDER">V2RAY_PLACEHOLDER</a></div>
-              <button class="copy-btn" onclick="copy('v2ray')">📋 复制 V2Ray 链接</button>
+          # 生成 HTML
+          cat > docs/index.html << HTMLEOF
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日免费节点</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;padding:16px;max-width:600px;margin:0 auto}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin:12px 0}
+h1{font-size:20px;margin-bottom:8px}
+.d{color:#58a6ff;font-size:14px;margin-bottom:16px}
+.i{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.i span{background:#21262d;padding:6px 12px;border-radius:8px;font-size:13px}
+.l{color:#8b949e;font-size:13px;margin:12px 0 6px}
+.btn{background:#238636;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0}
+.btn:active{background:#2ea043}
+.btn2{background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0}
+.btn2:active{background:#388bfd}
+.nodes{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:11px;font-family:monospace;word-break:break-all;max-height:400px;overflow-y:auto;margin:8px 0;color:#7ee787;line-height:1.8}
+.node{padding:4px 0;border-bottom:1px solid #21262d}
+.node:last-child{border:none}
+.n{color:#8b949e;font-size:12px;line-height:1.8}
+.search{width:100%;padding:10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:13px;margin:8px 0}
+.tag{display:inline-block;background:#21262d;padding:2px 8px;border-radius:4px;font-size:11px;margin:2px;cursor:pointer}
+.tag:hover{background:#30363d}
+.sub{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;word-break:break-all;margin:8px 0;color:#58a6ff}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🚀 每日免费节点</h1>
+<div class="d">${DATE:-今天}</div>
+<div class="i">
+<span>📊 ${NODE_COUNT:-0} 条线路</span>
+<span>⚡ ${SPEED:-未知}</span>
+</div>
 
-              <div class="label">Clash 配置预览：</div>
-              <div class="raw" id="clash-raw">加载中...</div>
+<div class="l">🔍 筛选地区：</div>
+<div id="tags"></div>
+<input class="search" id="search" placeholder="输入关键词筛选：美国、日本、香港、trojan、vmess..." oninput="filter()">
 
-              <div class="label">V2Ray 节点预览：</div>
-              <div class="raw" id="v2ray-raw">加载中...</div>
+<div class="l">📋 V2Ray 节点（点击可单独复制）：</div>
+<div class="nodes" id="nodes">加载中...</div>
 
-              <div class="note">
-                ⚠️ 免费节点多人共享，高峰可能较慢<br>
-                📱 Clash 客户端：配置 → 粘贴URL → 导入<br>
-                📱 V2RayN：订阅 → 添加 → 粘贴URL → 更新<br>
-                🕐 每日 UTC 00:00 (北京 08:00) 自动更新
-              </div>
-            </div>
+<button class="btn2" onclick="copyAll()">📋 复制全部节点（V2RayNG 批量导入）</button>
 
-            <script>
-              function copy(id) {
-                const text = document.getElementById(id).textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                  const btn = event.target;
-                  btn.textContent = '✅ 已复制！';
-                  setTimeout(() => btn.textContent = '📋 复制 ' + (id === 'clash' ? 'Clash' : 'V2Ray') + ' 链接', 2000);
-                });
-              }
-              fetch('clash-config.yaml').then(r => r.text()).then(t => {
-                document.getElementById('clash-raw').textContent = t.substring(0, 2000) + '\n...';
-              }).catch(() => document.getElementById('clash-raw').textContent = '暂无');
-              fetch('v2ray-nodes.txt').then(r => r.text()).then(t => {
-                document.getElementById('v2ray-raw').textContent = t.substring(0, 2000) + '\n...';
-              }).catch(() => document.getElementById('v2ray-raw').textContent = '暂无');
-            </script>
-          </body>
-          </html>
-          HTMLEOF
+<div class="l">🔗 Clash 订阅链接：</div>
+<div class="sub"><a href="${CLASH_URL:-#}" style="color:#58a6ff;text-decoration:none">${CLASH_URL:-未获取到}</a></div>
+<button class="btn" onclick="copyText('${CLASH_URL:-}')">📋 复制 Clash 链接</button>
 
-          # 替换占位符
-          sed -i "s|DATE_PLACEHOLDER|${DATE:-今天}|g" docs/index.html
-          sed -i "s|COUNT_PLACEHOLDER|${COUNT:-?}|g" docs/index.html
-          sed -i "s|SPEED_PLACEHOLDER|${SPEED:-未知}|g" docs/index.html
-          sed -i "s|CLASH_PLACEHOLDER|${CLASH_URL:-未获取到}|g" docs/index.html
-          sed -i "s|V2RAY_PLACEHOLDER|${V2RAY_URL:-未获取到}|g" docs/index.html
+<div class="n">
+💡 <b>使用方法：</b><br>
+<b>V2RayNG：</b>复制全部节点 → 打开V2RayNG → 右上角+ → 从剪贴板导入<br>
+<b>FlClash：</b>配置 → 粘贴 Clash 链接 → 确定<br><br>
+⚠️ 免费节点多人共享，高峰可能较慢<br>
+🕐 每天北京时间 08:00 自动更新
+</div>
+</div>
 
-          echo "done=true" >> $GITHUB_OUTPUT
+<script>
+const nodes = ${NODES_JSON:-[]};
+let filtered = [...nodes];
+
+function render(list) {
+  const el = document.getElementById('nodes');
+  if (!list.length) { el.innerHTML = '暂无节点'; return; }
+  el.innerHTML = list.map((n, i) =>
+    '<div class="node" onclick="copyOne(this,' + i + ')" style="cursor:pointer">' +
+    n.replace(/#/g, ' #') +
+    '</div>'
+  ).join('');
+}
+
+function getTags() {
+  const tags = new Set();
+  nodes.forEach(n => {
+    const m = n.match(/#(.+)/);
+    if (m) {
+      const parts = m[1].replace(/yoyapai\.com/g, '').split(/[丨|]/);
+      parts.forEach(p => { if (p.trim()) tags.add(p.trim()); });
+    }
+  });
+  const el = document.getElementById('tags');
+  el.innerHTML = [...tags].slice(0, 20).map(t =>
+    '<span class="tag" onclick="doFilter(this.textContent)">' + t + '</span>'
+  ).join(' ');
+}
+
+function filter() {
+  const q = document.getElementById('search').value.toLowerCase();
+  filtered = nodes.filter(n => n.toLowerCase().includes(q));
+  render(filtered);
+}
+
+function doFilter(q) {
+  document.getElementById('search').value = q;
+  filter();
+}
+
+function copyOne(el, i) {
+  navigator.clipboard.writeText(filtered[i]).then(() => {
+    el.style.color = '#3fb950';
+    setTimeout(() => el.style.color = '', 1500);
+  });
+}
+
+function copyAll() {
+  const text = filtered.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ 已复制 ' + filtered.length + ' 条节点！';
+    setTimeout(() => btn.textContent = '📋 复制全部节点（V2RayNG 批量导入）', 3000);
+  });
+}
+
+function copyText(t) {
+  if (!t || t === '未获取到') return;
+  navigator.clipboard.writeText(t).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ 已复制！';
+    setTimeout(() => btn.textContent = '📋 复制 Clash 链接', 2000);
+  });
+}
+
+render(nodes);
+getTags();
+</script>
+</body>
+</html>
+HTMLEOF
+
+          echo "done=true"
+          echo "节点数: $NODE_COUNT"
 
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
