@@ -67,6 +67,7 @@ jobs:
           echo "COUNT=$NODE_COUNT" >> $GITHUB_ENV
           echo "SPEED=$SPEED" >> $GITHUB_ENV
           echo "CLASH_URL=$CLASH_URL" >> $GITHUB_ENV
+          echo "V2RAY_URL=$V2RAY_URL" >> $GITHUB_ENV
 
       - name: 生成页面
         run: |
@@ -86,15 +87,13 @@ jobs:
           .i{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
           .i span{background:#21262d;padding:6px 12px;border-radius:8px;font-size:13px}
           .l{color:#8b949e;font-size:13px;margin:12px 0 6px}
-          .btn{background:#238636;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0}
+          .btn{display:block;background:#238636;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0;text-align:center;text-decoration:none}
           .btn:active{background:#2ea043}
-          .btn2{background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0}
+          .btn2{display:block;background:#1f6feb;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0;text-align:center;text-decoration:none}
           .btn2:active{background:#388bfd}
-          .nodes{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:11px;font-family:monospace;word-break:break-all;max-height:400px;overflow-y:auto;margin:8px 0;color:#7ee787;line-height:1.8}
-          .node{padding:4px 0;border-bottom:1px solid #21262d;cursor:pointer}
-          .node:last-child{border:none}
+          .btn3{display:block;background:#8957e5;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;cursor:pointer;width:100%;margin:4px 0;text-align:center;text-decoration:none}
+          .btn3:active{background:#a371f7}
           .n{color:#8b949e;font-size:12px;line-height:1.8}
-          .search{width:100%;padding:10px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:13px;margin:8px 0}
           .sub{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;word-break:break-all;margin:8px 0;color:#58a6ff}
           a{color:#58a6ff;text-decoration:none}
           </style>
@@ -108,68 +107,41 @@ jobs:
           <span>⚡ __SPEED__</span>
           </div>
 
-          <button class="btn" onclick="location.href='v2ray-nodes.txt'" style="background:#238636">⬇️ 下载 V2Ray 全部节点 (txt)</button>
-          <button class="btn" onclick="location.href='v2ray-links.txt'" style="background:#1f6feb">⬇️ 下载纯节点链接 (txt)</button>
-          <button class="btn" onclick="location.href='clash-config.yaml'" style="background:#8957e5">⬇️ 下载 Clash 配置 (yaml)</button>
+          <a class="btn" href="v2ray-nodes.txt" download="v2ray-订阅.txt">⬇️ 下载 V2Ray 全部节点 (txt)</a>
+          <a class="btn2" href="v2ray-links.txt" download="v2ray-纯链接.txt">⬇️ 下载纯节点链接 (txt)</a>
+          <a class="btn3" href="clash-config.yaml" download="clash-config.yaml">⬇️ 下载 Clash 配置 (yaml)</a>
 
-          <div class="l">🔍 筛选节点：</div>
-          <input class="search" id="search" placeholder="输入关键词：美国、日本、香港、trojan、vmess..." oninput="filter()">
-
-          <div class="l">📋 V2Ray 节点（点击单独复制）：</div>
-          <div class="nodes" id="nodes">加载中...</div>
-
-          <button class="btn2" onclick="copyAll()">📋 复制全部节点（V2RayNG 从剪贴板导入）</button>
-
-          <div class="l">🔗 Clash 订阅链接：</div>
+          <div class="l">🔗 Clash / Mihomo 订阅链接：</div>
           <div class="sub" id="clash-url">__CLASH_URL__</div>
-          <button class="btn" onclick="copySub()">📋 复制 Clash 链接</button>
+          <button class="btn" id="clash-btn" onclick="copyClash()">📋 复制 Clash 链接</button>
+
+          <div class="l">🔗 V2Ray / V2RayNG 订阅链接：</div>
+          <div class="sub" id="v2ray-url">__V2RAY_URL__</div>
+          <button class="btn2" id="v2ray-btn" onclick="copyV2Ray()">📋 复制 V2Ray 链接</button>
 
           <div class="n">
-          💡 <b>V2RayNG 导入方法：</b><br>
-          方式1: 下载 txt → V2RayNG → 右上角+ → 导入配置文件<br>
-          方式2: 复制全部节点 → V2RayNG → 右上角+ → 从剪贴板导入<br><br>
-          💡 <b>FlClash 导入方法：</b><br>
-          复制 Clash 链接 → FlClash 配置 → 粘贴 → 确定<br><br>
+          💡 <b>FlClash 导入：</b>复制 Clash 链接 → 配置 → 粘贴 → 确定<br>
+          💡 <b>V2RayNG 导入：</b>复制 V2Ray 链接 → 右上角+ → 订阅设置 → 粘贴 → 保存并更新<br><br>
           ⚠️ 免费节点多人共享，高峰可能较慢<br>
           🕐 每天北京时间 08:00 自动更新
           </div>
           </div>
 
           <script>
-          let nodes=[], filtered=[];
-          fetch('nodes.json').then(r=>r.json()).then(d=>{nodes=d;filtered=[...d];render()}).catch(()=>document.getElementById('nodes').textContent='暂无节点');
-
-          function render(){
-            const el=document.getElementById('nodes');
-            if(!filtered.length){el.innerHTML='暂无节点';return;}
-            el.innerHTML=filtered.map((n,i)=>'<div class="node" onclick="copyOne(this,'+i+')">'+n.replace(/#/g,' #')+'</div>').join('');
-          }
-
-          function filter(){
-            const q=document.getElementById('search').value.toLowerCase();
-            filtered=nodes.filter(n=>n.toLowerCase().includes(q));
-            render();
-          }
-
-          function copyOne(el,i){
-            navigator.clipboard.writeText(filtered[i]).then(()=>{
-              el.style.color='#3fb950';setTimeout(()=>el.style.color='',1500);
+          function copyClash(){
+            var url=document.getElementById('clash-url').textContent;
+            var btn=document.getElementById('clash-btn');
+            navigator.clipboard.writeText(url).then(function(){
+              btn.textContent='✅ 已复制！';
+              setTimeout(function(){btn.textContent='📋 复制 Clash 链接'},2000);
             });
           }
-
-          function copyAll(){
-            navigator.clipboard.writeText(filtered.join('\n')).then(()=>{
-              const btn=event.target;
-              btn.textContent='✅ 已复制 '+filtered.length+' 条节点！';
-              setTimeout(()=>btn.textContent='📋 复制全部节点（V2RayNG 从剪贴板导入）',3000);
-            });
-          }
-
-          function copySub(){
-            const t=document.getElementById('clash-url').textContent;
-            navigator.clipboard.writeText(t).then(()=>{
-              const btn=event.target;btn.textContent='✅ 已复制！';
-              setTimeout(()=>btn.textContent='📋 复制 Clash 链接',2000);
+          function copyV2Ray(){
+            var url=document.getElementById('v2ray-url').textContent;
+            var btn=document.getElementById('v2ray-btn');
+            navigator.clipboard.writeText(url).then(function(){
+              btn.textContent='✅ 已复制！';
+              setTimeout(function(){btn.textContent='📋 复制 V2Ray 链接'},2000);
             });
           }
           </script>
@@ -182,6 +154,7 @@ jobs:
           sed -i "s|__COUNT__|${{ env.COUNT }}|g" docs/index.html
           sed -i "s|__SPEED__|${{ env.SPEED }}|g" docs/index.html
           sed -i "s|__CLASH_URL__|${{ env.CLASH_URL }}|g" docs/index.html
+          sed -i "s|__V2RAY_URL__|${{ env.V2RAY_URL }}|g" docs/index.html
 
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
