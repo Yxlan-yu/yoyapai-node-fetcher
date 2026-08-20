@@ -112,11 +112,11 @@ jobs:
           <a class="btn3" href="clash-config.yaml" download="clash-config.yaml">⬇️ 下载 Clash 配置 (yaml)</a>
 
           <div class="l">🔗 Clash / Mihomo 订阅链接：</div>
-          <div class="sub" id="clash-url">__CLASH_URL__</div>
+          <div class="sub" id="clash-url">https://yxlan-yu.github.io/yoyapai-node-fetcher/clash-config.yaml</div>
           <button class="btn" id="clash-btn" onclick="copyClash()">📋 复制 Clash 链接</button>
 
           <div class="l">🔗 V2Ray / V2RayNG 订阅链接：</div>
-          <div class="sub" id="v2ray-url">__V2RAY_URL__</div>
+          <div class="sub" id="v2ray-url">https://yxlan-yu.github.io/yoyapai-node-fetcher/v2ray-nodes.txt</div>
           <button class="btn2" id="v2ray-btn" onclick="copyV2Ray()">📋 复制 V2Ray 链接</button>
 
           <div class="n">
@@ -153,8 +153,8 @@ jobs:
           sed -i "s|__DATE__|${{ env.DATE }}|g" docs/index.html
           sed -i "s|__COUNT__|${{ env.COUNT }}|g" docs/index.html
           sed -i "s|__SPEED__|${{ env.SPEED }}|g" docs/index.html
-          sed -i "s|__CLASH_URL__|${{ env.CLASH_URL }}|g" docs/index.html
-          sed -i "s|__V2RAY_URL__|${{ env.V2RAY_URL }}|g" docs/index.html
+          sed -i "s|https://yxlan-yu.github.io/yoyapai-node-fetcher/clash-config.yaml|${{ env.CLASH_URL }}|g" docs/index.html
+          sed -i "s|https://yxlan-yu.github.io/yoyapai-node-fetcher/v2ray-nodes.txt|${{ env.V2RAY_URL }}|g" docs/index.html
 
       - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
