@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pages: write
+  issues: write
 
 jobs:
   fetch:
@@ -119,6 +120,13 @@ jobs:
             echo "WARN: 下载的文件过小，可能有问题" >&2
           fi
 
+          # 节点数校验：少于 50 条认为异常
+          if [ "$NODE_COUNT" -lt 50 ]; then
+            echo "ERROR: 节点数过少 (${NODE_COUNT} 条)，可能源站异常" >&2
+            echo "fetch_success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
           # 输出到 GITHUB_ENV
           echo "DATE=${DATE:-$(date +%Y-%m-%d)}" >> $GITHUB_ENV
           echo "COUNT=${NODE_COUNT}" >> $GITHUB_ENV
@@ -193,7 +201,6 @@ jobs:
               btn.textContent='✅ 已复制！';
               setTimeout(function(){btn.textContent='📋 复制 '+name+' 链接'},2000);
             }).catch(function(){
-              // fallback for non-HTTPS
               var ta=document.createElement('textarea');
               ta.value=url;document.body.appendChild(ta);
               ta.select();document.execCommand('copy');
@@ -229,10 +236,28 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `⚠️ 节点抓取失败 - ${new Date().toISOString().slice(0,10)}`,
-              body: `## 每日节点抓取失败
-
-**时间**: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}
-**运行**: [查看 Actions](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
-
-页面将保留前一天的数据，请排查原因。`
+              body: `## 每日节点抓取失败\n\n**时间**: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}\n**运行**: [查看 Actions](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n页面将保留前一天的数据，请排查原因。`
             });
+
+      - name: 关闭旧的失败告警
+        if: steps.fetch.outputs.fetch_success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            for (const issue of issues.data) {
+              if (issue.title.startsWith('⚠️ 节点抓取失败')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+                console.log(`已关闭 Issue #${issue.number}`);
+              }
+            }
