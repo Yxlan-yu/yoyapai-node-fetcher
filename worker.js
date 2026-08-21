@@ -68,7 +68,7 @@ h1{font-size:20px;margin-bottom:8px}
 ⚠️ 免费节点多人共享，高峰可能较慢<br>
 📱 Clash：配置 → 粘贴URL → 导入<br>
 📱 V2RayN：订阅 → 添加 → 粘贴URL → 更新<br>
-🕐 每天北京时间 08:00 自动更新
+🕐 每天北京时间 12:00 自动更新
 </div></div>
 <script>function cp(i){const t=document.getElementById(i).textContent;navigator.clipboard.writeText(t).then(()=>{const b=event.target;b.textContent='✅ 已复制！';setTimeout(()=>b.textContent='📋 复制 '+(i==='c'?'Clash':'V2Ray')+' 链接',2000)})}</script>
 </body></html>`;
