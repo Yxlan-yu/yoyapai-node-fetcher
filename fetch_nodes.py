@@ -7,6 +7,7 @@
 import re
 import os
 import sys
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -14,6 +15,8 @@ from datetime import datetime
 # --- 配置 ---
 CATEGORY_URL = "https://yoyapai.com/category/mianfeijiedian"
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "yoyapai-nodes")
+MAX_RETRIES = 3
+RETRY_DELAY = 5
 
 # --- 颜色 (Termux/Linux/macOS) ---
 if sys.platform != "win32":
@@ -25,24 +28,30 @@ if sys.platform != "win32":
 else:
     CYAN = GREEN = YELLOW = RED = NC = ""
 
-
 def info(msg): print(f"{CYAN}[INFO]{NC} {msg}")
 def ok(msg):   print(f"{GREEN}[OK]{NC} {msg}")
 def warn(msg): print(f"{YELLOW}[WARN]{NC} {msg}")
 def fail(msg): print(f"{RED}[FAIL]{NC} {msg}"); sys.exit(1)
 
 
-def fetch(url: str, timeout: int = 30) -> str:
-    """获取网页内容"""
+def fetch(url: str, timeout: int = 45) -> str:
+    """获取网页内容（带重试）"""
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
                        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     })
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", errors="replace")
-    except urllib.error.URLError as e:
-        fail(f"网络请求失败: {e}")
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = resp.read().decode("utf-8", errors="replace")
+                if data.strip():
+                    return data
+                warn(f"第 {attempt} 次尝试返回空内容")
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
+            warn(f"第 {attempt} 次尝试失败: {e}")
+        if attempt < MAX_RETRIES:
+            time.sleep(RETRY_DELAY)
+    fail(f"网络请求失败，已重试 {MAX_RETRIES} 次: {url}")
 
 
 def extract_latest_url(html: str) -> str:
@@ -57,8 +66,8 @@ def extract_article_info(html: str) -> dict:
 
     # 订阅链接 (处理 &#47; 等 HTML 实体)
     decoded = html.replace("&#47;", "/").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    clash = re.findall(r'https://freenode\.yoyapai\.com/[^"<>\s]+\.yaml', decoded)
-    v2ray = re.findall(r'https://freenode\.yoyapai\.com/[^"<>\s]+\.txt', decoded)
+    clash = re.findall(r'https://freenode\.yoyapai\.com/[^"<>\\s]+\.yaml', decoded)
+    v2ray = re.findall(r'https://freenode\.yoyapai\.com/[^"<>\\s]+\.txt', decoded)
     info["clash_url"] = clash[0] if clash else ""
     info["v2ray_url"] = v2ray[0] if v2ray else ""
 
@@ -87,13 +96,16 @@ def main():
     category_html = fetch(CATEGORY_URL)
     latest_url = extract_latest_url(category_html)
     if not latest_url:
-        fail("无法获取最新文章链接，请检查网络")
+        fail("无法获取最新文章链接，请检查网络或源站是否改版")
     ok(f"最新文章: {latest_url}")
 
     # Step 2: 获取文章页
     info("正在提取节点订阅链接...")
     article_html = fetch(latest_url)
     article = extract_article_info(article_html)
+
+    if not article["clash_url"] and not article["v2ray_url"]:
+        fail("未找到任何订阅链接，源站可能改版")
 
     # Step 3: 显示结果
     print()

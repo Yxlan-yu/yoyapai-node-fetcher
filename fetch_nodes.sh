@@ -9,6 +9,8 @@ CATEGORY_URL="https://yoyapai.com/category/mianfeijiedian"
 OUTPUT_DIR="${HOME}/yoyapai-nodes"
 TODAY=$(date +%Y-%m-%d)
 OUTPUT_FILE="${OUTPUT_DIR}/${TODAY}.txt"
+MAX_RETRIES=3
+RETRY_DELAY=5
 
 # --- 颜色 ---
 RED='\033[0;31m'
@@ -21,6 +23,31 @@ info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
+
+# --- 带重试的 curl ---
+retry_curl() {
+    local url="$1"
+    local output="$2"
+    local attempt=1
+    while [ $attempt -le $MAX_RETRIES ]; do
+        if [ -n "$output" ]; then
+            if curl -sL --connect-timeout 20 --max-time 60 "$url" -o "$output" 2>/dev/null && [ -s "$output" ]; then
+                return 0
+            fi
+        else
+            local result
+            result=$(curl -sL --connect-timeout 20 --max-time 60 "$url" 2>/dev/null)
+            if [ -n "$result" ]; then
+                echo "$result"
+                return 0
+            fi
+        fi
+        warn "第 ${attempt} 次尝试失败，重试中..."
+        attempt=$((attempt + 1))
+        sleep $RETRY_DELAY
+    done
+    return 1
+}
 
 # --- 依赖检查 ---
 for cmd in curl grep sed; do
@@ -42,10 +69,10 @@ mkdir -p "$OUTPUT_DIR"
 
 # --- Step 1: 获取分类页，提取最新文章链接 ---
 info "正在获取最新文章列表..."
-CATEGORY_HTML=$(curl -sL --connect-timeout 20 --max-time 45 "$CATEGORY_URL" 2>/dev/null)
+CATEGORY_HTML=$(retry_curl "https://yoyapai.com/category/mianfeijiedian")
 
 if [[ -z "$CATEGORY_HTML" ]]; then
-    fail "获取分类页失败，返回为空"
+    fail "获取分类页失败，已重试 ${MAX_RETRIES} 次"
 fi
 
 # 还原 HTML 实体
@@ -66,10 +93,10 @@ ok "最新文章: $LATEST_URL"
 
 # --- Step 2: 获取文章页面 ---
 info "正在读取文章内容..."
-PAGE=$(curl -sL --connect-timeout 20 --max-time 45 "$LATEST_URL" 2>/dev/null)
+PAGE=$(retry_curl "$LATEST_URL")
 
 if [[ -z "$PAGE" ]]; then
-    fail "获取文章页面失败"
+    fail "获取文章页面失败，已重试 ${MAX_RETRIES} 次"
 fi
 
 # 还原 HTML 实体 (&#47; -> / 等)
@@ -148,22 +175,32 @@ echo "" >> "$OUTPUT_FILE"
 
 if [[ -n "$CLASH_URL" ]]; then
     info "正在下载 Clash 配置..."
-    CLASH_CONTENT=$(curl -sL --connect-timeout 20 --max-time 60 "$CLASH_URL" 2>/dev/null || echo "# 下载失败")
-    echo "[Clash 配置文件内容]" >> "$OUTPUT_FILE"
-    echo "$CLASH_CONTENT" >> "$OUTPUT_FILE"
-    echo "" >> "$OUTPUT_FILE"
-    CLASH_LINES=$(echo "$CLASH_CONTENT" | wc -l)
-    ok "Clash 配置: ${CLASH_LINES} 行"
+    CLASH_CONTENT=$(retry_curl "$CLASH_URL")
+    if [[ -n "$CLASH_CONTENT" ]]; then
+        echo "[Clash 配置文件内容]" >> "$OUTPUT_FILE"
+        echo "$CLASH_CONTENT" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
+        CLASH_LINES=$(echo "$CLASH_CONTENT" | wc -l)
+        ok "Clash 配置: ${CLASH_LINES} 行"
+    else
+        warn "Clash 配置下载失败"
+        echo "# Clash 配置下载失败" >> "$OUTPUT_FILE"
+    fi
 fi
 
 if [[ -n "$V2RAY_URL" ]]; then
     info "正在下载 V2Ray 配置..."
-    V2RAY_CONTENT=$(curl -sL --connect-timeout 20 --max-time 60 "$V2RAY_URL" 2>/dev/null || echo "# 下载失败")
-    echo "[V2Ray 节点列表]" >> "$OUTPUT_FILE"
-    echo "$V2RAY_CONTENT" >> "$OUTPUT_FILE"
-    echo "" >> "$OUTPUT_FILE"
-    V2RAY_LINES=$(echo "$V2RAY_CONTENT" | wc -l)
-    ok "V2Ray 节点: ${V2RAY_LINES} 条"
+    V2RAY_CONTENT=$(retry_curl "$V2RAY_URL")
+    if [[ -n "$V2RAY_CONTENT" ]]; then
+        echo "[V2Ray 节点列表]" >> "$OUTPUT_FILE"
+        echo "$V2RAY_CONTENT" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
+        V2RAY_LINES=$(echo "$V2RAY_CONTENT" | wc -l)
+        ok "V2Ray 节点: ${V2RAY_LINES} 条"
+    else
+        warn "V2Ray 配置下载失败"
+        echo "# V2Ray 配置下载失败" >> "$OUTPUT_FILE"
+    fi
 fi
 
 # --- Step 5: 生成快捷导入文件 ---
