@@ -212,41 +212,8 @@ jobs:
           sed -i "s|__COUNT__|${{ env.COUNT }}|g" docs/index.html
           sed -i "s|__SPEED__|${{ env.SPEED }}|g" docs/index.html
 
-      - name: 生成失败回退页面
-        if: steps.fetch.outputs.fetch_success != 'true'
-        run: |
-          cat > docs/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="zh">
-          <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>每日免费节点 - 更新中</title>
-          <style>
-          *{margin:0;padding:0;box-sizing:border-box}
-          body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;padding:16px;max-width:600px;margin:0 auto;display:flex;min-height:100vh;align-items:center;justify-content:center}
-          .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;text-align:center}
-          h1{font-size:20px;margin-bottom:12px}
-          .msg{color:#f0c000;margin:12px 0;font-size:14px}
-          .n{color:#8b949e;font-size:12px;line-height:1.8;margin-top:16px}
-          a{color:#58a6ff;text-decoration:none}
-          </style>
-          </head>
-          <body>
-          <div class="card">
-          <h1>🚀 每日免费节点</h1>
-          <div class="msg">⚠️ 今日节点抓取失败，正在重试中...</div>
-          <div class="n">
-          通常每天北京时间 08:00 自动更新<br>
-          如果持续显示此页面，请访问 <a href="https://yoyapai.com/category/mianfeijiedian">源站</a> 获取节点<br><br>
-          <a href="https://github.com/yxlan-yu/yoyapai-node-fetcher/actions">查看 Actions 运行状态</a>
-          </div>
-          </div>
-          </body>
-          </html>
-          EOF
-
       - name: 部署到 GitHub Pages
+        if: steps.fetch.outputs.fetch_success == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
