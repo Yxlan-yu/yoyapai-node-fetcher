@@ -55,19 +55,19 @@ h1{font-size:20px;margin-bottom:8px}
 <h1>🚀 每日免费节点</h1>
 <div class="d">${dateMatch?.[1] || "今天"}</div>
 <div class="i">
-<span>📊 ${countMatch?.[1] || "?"} 个节点</span>
+<span>📊 ${countMatch?.[1] || "?"} 条线路</span>
 <span>⚡ ${speedMatch?.[1] || "未知"}</span>
 </div>
 <div class="label">Clash / Mihomo 订阅：</div>
 <div class="u"><a id="c" href="${clashMatch?.[0] || "#"}">${clashMatch?.[0] || "未获取到"}</a></div>
 <button class="b" onclick="cp('c')">📋 复制 Clash 链接</button>
-<div class="l">V2Ray / V2RayN 订阅：</div>
+<div class="l">V2Ray / V2RayNG 订阅：</div>
 <div class="u"><a id="v" href="${v2rayMatch?.[0] || "#"}">${v2rayMatch?.[0] || "未获取到"}</a></div>
 <button class="b" onclick="cp('v')">📋 复制 V2Ray 链接</button>
 <div class="n">
 ⚠️ 免费节点多人共享，高峰可能较慢<br>
-📱 Clash：配置 → 粘贴URL → 导入<br>
-📱 V2RayN：订阅 → 添加 → 粘贴URL → 更新<br>
+💡 <b>FlClash 导入：</b>复制 Clash 链接 → 配置 → 粘贴 → 确定<br>
+💡 <b>V2RayNG 导入：</b>复制 V2Ray 链接 → 右上角+ → 订阅设置 → 粘贴 → 保存并更新<br>
 🕐 每天北京时间 12:00 自动更新
 </div></div>
 <script>function cp(i){const t=document.getElementById(i).textContent;navigator.clipboard.writeText(t).then(()=>{const b=event.target;b.textContent='✅ 已复制！';setTimeout(()=>b.textContent='📋 复制 '+(i==='c'?'Clash':'V2Ray')+' 链接',2000)})}</script>
