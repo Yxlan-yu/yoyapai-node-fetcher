@@ -237,7 +237,7 @@ jobs:
           force_orphan: true
 
       - name: 失败告警
-        if: failure() || steps.fetch.outputs.fetch_success != 'true'
+        if: always() && steps.fetch.outputs.fetch_success != 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -270,3 +270,4 @@ jobs:
                 console.log(`已关闭 Issue #${issue.number}`);
               }
             }
+
