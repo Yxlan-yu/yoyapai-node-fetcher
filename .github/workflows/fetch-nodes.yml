@@ -21,28 +21,37 @@ jobs:
         run: |
           mkdir -p docs
 
-          # 带重试的 curl 函数
+          # 带重试的 curl 函数（加强版：UA + 更多重试 + 更长间隔）
           retry_curl() {
             local url="$1"
             local output="$2"
-            local max_retries=3
+            local max_retries=5
             local attempt=1
+            local ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             while [ $attempt -le $max_retries ]; do
               if [ -n "$output" ]; then
-                if curl -sL --connect-timeout 20 --max-time 60 "$url" -o "$output" 2>/dev/null && [ -s "$output" ]; then
+                if curl -sL --connect-timeout 30 --max-time 90 \
+                  -H "User-Agent: $ua" \
+                  -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+                  -H "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8" \
+                  "$url" -o "$output" 2>/dev/null && [ -s "$output" ]; then
                   return 0
                 fi
               else
                 local result
-                result=$(curl -sL --connect-timeout 20 --max-time 60 "$url" 2>/dev/null)
+                result=$(curl -sL --connect-timeout 30 --max-time 90 \
+                  -H "User-Agent: $ua" \
+                  -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+                  -H "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8" \
+                  "$url" 2>/dev/null)
                 if [ -n "$result" ]; then
                   echo "$result"
                   return 0
                 fi
               fi
-              echo "  ⚠️ 第 ${attempt} 次尝试失败，重试中..."
+              echo "  ⚠️ 第 ${attempt}/${max_retries} 次尝试失败"
               attempt=$((attempt + 1))
-              sleep 5
+              [ $attempt -le $max_retries ] && sleep 15
             done
             return 1
           }
@@ -53,7 +62,7 @@ jobs:
           if [ -z "$CATEGORY_HTML" ]; then
             echo "ERROR: 无法获取分类页" >&2
             echo "fetch_success=false" >> $GITHUB_OUTPUT
-            exit 1
+            exit 0
           fi
 
           CATEGORY_HTML=$(echo "$CATEGORY_HTML" | sed 's/&#47;/\//g')
@@ -62,7 +71,7 @@ jobs:
           if [ -z "$LATEST_URL" ]; then
             echo "ERROR: 无法提取最新文章链接" >&2
             echo "fetch_success=false" >> $GITHUB_OUTPUT
-            exit 1
+            exit 0
           fi
           echo "📰 最新文章: $LATEST_URL"
 
@@ -72,7 +81,7 @@ jobs:
           if [ -z "$PAGE" ]; then
             echo "ERROR: 无法获取文章页面" >&2
             echo "fetch_success=false" >> $GITHUB_OUTPUT
-            exit 1
+            exit 0
           fi
 
           PAGE=$(echo "$PAGE" | sed 's/&#47;/\//g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g')
@@ -84,7 +93,7 @@ jobs:
           if [ -z "$CLASH_URL" ] && [ -z "$V2RAY_URL" ]; then
             echo "ERROR: 未找到任何订阅链接" >&2
             echo "fetch_success=false" >> $GITHUB_OUTPUT
-            exit 1
+            exit 0
           fi
 
           # 提取信息
@@ -124,7 +133,7 @@ jobs:
           if [ "$NODE_COUNT" -lt 50 ]; then
             echo "ERROR: 节点数过少 (${NODE_COUNT} 条)，可能源站异常" >&2
             echo "fetch_success=false" >> $GITHUB_OUTPUT
-            exit 1
+            exit 0
           fi
 
           # 输出到 GITHUB_ENV
