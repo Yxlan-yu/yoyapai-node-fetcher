@@ -195,8 +195,8 @@ jobs:
           <button class="btn2" id="v2ray-btn" onclick="copyLink('v2ray-url','v2ray-btn','V2Ray')">📋 复制 V2Ray 链接</button>
 
           <div class="n">
-          💡 <b>FlClash 导入：</b>复制 Clash 链接 → 配置 → 粘贴 → 确定<br>
-          💡 <b>V2RayNG 导入：</b>复制 V2Ray 链接 → 右上角+ → 订阅设置 → 粘贴 → 保存并更新<br><br>
+          <b>Android端</b><br>💡 <b>FlClash 导入：</b>复制 Clash 链接 → 配置 → 粘贴 → 确定<br>
+          💡 <b>V2RayNG 导入：</b>复制 V2Ray 链接 → 右上角+ → 从剪切板导入 → 右上角三竖点 → 更新订阅<br><br>
           ⚠️ 免费节点多人共享，高峰可能较慢<br>
           🕐 每天北京时间 8:00 后自动更新
           </div>
@@ -270,6 +270,7 @@ jobs:
                 console.log(`已关闭 Issue #${issue.number}`);
               }
             }
+
 
 
 
